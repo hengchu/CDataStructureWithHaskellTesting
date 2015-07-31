@@ -1,0 +1,5 @@
+*.o
+rbtree_main
+*_stub.h
+*.swp
+*.dSYM
