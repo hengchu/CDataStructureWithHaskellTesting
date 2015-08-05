@@ -26,6 +26,11 @@ void mcl_rbtree_destroy(MCLRBTree *tree);
 // Insert an item into the red black tree.
 void mcl_rbtree_insert(MCLRBTree *tree, MCLItemType item);
 
+// Delete an item from the red black tree.
+// Returns zero on success
+// Returns non-zero value on failure.
+uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item);
+
 // Return non-zero value if tree is empty
 // Return zero if tree is non-empty
 uint8_t mcl_rbtree_empty(MCLRBTree *tree);

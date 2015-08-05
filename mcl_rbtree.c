@@ -42,6 +42,8 @@ MCLRBTreeNode *_mcl_rbtree_node_rotate_left(MCLRBTreeNode *node);
 // These rebalance functions return the parent of the root of the
 // rebalanced subtree, and return the root of the rebalanced subtree
 // into the variable new_subtree_root.
+// The new_subtree_root is the root of the subtree that has been modified
+// as part of the rebalancing.
 MCLRBTreeNode *_mcl_rbtree_rebalance_1(
     MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
 MCLRBTreeNode *_mcl_rbtree_rebalance_2(
@@ -51,6 +53,23 @@ MCLRBTreeNode *_mcl_rbtree_rebalance_3(
 MCLRBTreeNode *_mcl_rbtree_rebalance_4(
     MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
 MCLRBTreeNode *_mcl_rbtree_rebalance_5(
+    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
+
+MCLRBTreeNode *_mcl_rbtree_delete_node_with_one_child(
+    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
+
+
+MCLRBTreeNode *_mcl_rbtree_delete_rebalance_1(
+    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
+MCLRBTreeNode *_mcl_rbtree_delete_rebalance_2(
+    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
+MCLRBTreeNode *_mcl_rbtree_delete_rebalance_3(
+    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
+MCLRBTreeNode *_mcl_rbtree_delete_rebalance_4(
+    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
+MCLRBTreeNode *_mcl_rbtree_delete_rebalance_5(
+    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
+MCLRBTreeNode *_mcl_rbtree_delete_rebalance_6(
     MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
 
 // The node argument is Nullable. The color of a NULL
@@ -84,6 +103,50 @@ MCLRBTreeNode *_mcl_rbtree_node_parent(MCLRBTreeNode *node)
 MCLRBTreeNode *_mcl_rbtree_node_grand_parent(MCLRBTreeNode *node)
 {
   return _mcl_rbtree_node_parent(_mcl_rbtree_node_parent(node));
+}
+
+MCLRBTreeNode *_mcl_rbtree_node_sibling(MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *parent = _mcl_rbtree_node_parent(node);
+
+  if (parent && node == parent->left)
+  {
+    return parent->right;
+  }
+  else if (parent && node == parent->right)
+  {
+    return parent->left;
+  }
+  else
+  {
+    return NULL;
+  }
+}
+
+MCLRBTreeNode *_mcl_rbtree_node_inorder_predecessor(MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *curr = node->left;
+  assert(curr);
+
+  while (curr->right)
+  {
+    curr = curr->right;
+  }
+
+  return curr;
+}
+
+MCLRBTreeNode *_mcl_rbtree_node_inorder_successor(MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *curr = node->right;
+  assert(curr);
+
+  while (curr->left)
+  {
+    curr = curr->left;
+  }
+
+  return curr;
 }
 
 // Return the uncle of a node.
@@ -354,4 +417,69 @@ MCLRBTreeNode *_mcl_rbtree_rebalance_5(
 
   *new_subtree_root = new_root;
   return parent_gparent;
+}
+
+MCLRBTreeNode *_mcl_rbtree_find_node(MCLRBTreeNode *root
+                                    ,MCLItemType item
+                                    ,MCLComparator cmp
+                                    ,void *user_data)
+{
+  if (root->data == item || !root)
+  {
+    return root;
+  }
+
+  if (cmp(item, root->data, user_data) < 0)
+  {
+    return _mcl_rbtree_find_node(root->left, item, cmp, user_data);
+  }
+  else
+  {
+    return _mcl_rbtree_find_node(root->right, item, cmp, user_data);
+  }
+}
+
+uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item)
+{
+  MCLRBTreeNode *node_to_delete
+    = _mcl_rbtree_find_node(tree->root, item, tree->cmp, tree->user_data);
+
+  if (node_to_delete)
+  {
+    if (node_to_delete->left && node_to_delete->right)
+    {
+      // Replace inorder successor with node_to_delete
+      MCLRBTreeNode *succ  = _mcl_rbtree_node_inorder_successor(node_to_delete);
+      MCLItemType    temp  = succ->data;
+      succ->data           = node_to_delete->data;
+      node_to_delete->data = temp;
+
+      node_to_delete       = succ;
+    }
+
+    MCLRBTreeNode *new_subtree_root = NULL;
+
+    MCLRBTreeNode *up_one_node
+      = _mcl_rbtree_delete_node_with_one_child(
+          node_to_delete, &new_subtree_root);
+
+    if (NULL == up_one_node)
+    {
+      tree->root = new_subtree_root;
+    }
+
+    return 0;
+  }
+  else
+  {
+    return 1;
+  }
+}
+
+MCLRBTreeNode *_mcl_rbtree_delete_node_with_one_child(
+    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root)
+{
+  // Precondition, node has at most one
+  // non-NULL children.
+  assert(!(node->left && node->right));
 }
