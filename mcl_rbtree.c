@@ -27,196 +27,143 @@ typedef struct MCLRBTreeNode {
 
 struct MCLRBTree {
   uint32_t       num_items;
+
   MCLRBTreeNode *root;
+
+  MCLRBTreeNode *sentinel;
+
   // This function pointer is used to order
   // tree elements.
   MCLComparator  cmp;
+  //
   // This field is passed to the comparator.
   void          *user_data;
 };
 
-// The rotation functions return the new root of the rotated subtree.
-MCLRBTreeNode *_mcl_rbtree_node_rotate_right(MCLRBTreeNode *node);
-MCLRBTreeNode *_mcl_rbtree_node_rotate_left(MCLRBTreeNode *node);
-
-// These rebalance functions return the parent of the root of the
-// rebalanced subtree, and return the root of the rebalanced subtree
-// into the variable new_subtree_root.
-// The new_subtree_root is the root of the subtree that has been modified
-// as part of the rebalancing.
-MCLRBTreeNode *_mcl_rbtree_rebalance_1(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_rebalance_2(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_rebalance_3(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_rebalance_4(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_rebalance_5(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-
-MCLRBTreeNode *_mcl_rbtree_delete_node_with_one_child(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-
-
-MCLRBTreeNode *_mcl_rbtree_delete_rebalance_1(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_delete_rebalance_2(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_delete_rebalance_3(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_delete_rebalance_4(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_delete_rebalance_5(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-MCLRBTreeNode *_mcl_rbtree_delete_rebalance_6(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root);
-
-// The node argument is Nullable. The color of a NULL
-// node is BLACK by definition.
-MCLRBTreeNodeColor _mcl_rbtree_node_color(MCLRBTreeNode *node)
+int _mcl_rbtree_validate_pointers(
+     MCLRBTree *tree
+    ,MCLRBTreeNode *node
+    ,MCLRBTreeNode *parent)
 {
-  return (node) ? node->color : MCL_RBTREE_NODE_BLACK;
-}
-
-// The first argument to this function is Nullable.
-// Passing NULL a the first argument results in a no-op.
-void _mcl_rbtree_node_set_color(MCLRBTreeNode *node, MCLRBTreeNodeColor color)
-{
-  if (node)
+  if (node == tree->sentinel)
   {
-    node->color = color;
-  }
-}
-
-// Return the parent of a node.
-// The parent of a NULL node is
-// NULL.
-MCLRBTreeNode *_mcl_rbtree_node_parent(MCLRBTreeNode *node)
-{
-  return (node) ? node->parent : NULL;
-}
-
-// Return the grand parent of a node
-// For nodes with no grand parents
-// it returns NULL.
-MCLRBTreeNode *_mcl_rbtree_node_grand_parent(MCLRBTreeNode *node)
-{
-  return _mcl_rbtree_node_parent(_mcl_rbtree_node_parent(node));
-}
-
-MCLRBTreeNode *_mcl_rbtree_node_sibling(MCLRBTreeNode *node)
-{
-  MCLRBTreeNode *parent = _mcl_rbtree_node_parent(node);
-
-  if (parent && node == parent->left)
-  {
-    return parent->right;
-  }
-  else if (parent && node == parent->right)
-  {
-    return parent->left;
+    return 1;
   }
   else
   {
-    return NULL;
+    return (node->parent == parent) 
+      && _mcl_rbtree_validate_pointers(tree, node->left, node)
+      && _mcl_rbtree_validate_pointers(tree, node->right, node);
   }
 }
 
-MCLRBTreeNode *_mcl_rbtree_node_inorder_predecessor(MCLRBTreeNode *node)
+MCLRBTreeNode *_mcl_rbtree_node_find(MCLRBTree *tree, MCLItemType item)
 {
-  MCLRBTreeNode *curr = node->left;
-  assert(curr);
+  MCLRBTreeNode *x = tree->root;
 
-  while (curr->right)
+  while (x != tree->sentinel && x->data != item)
   {
-    curr = curr->right;
+
+    int cmp_result = tree->cmp(item, x->data, tree->user_data);
+
+    if (cmp_result < 0)
+    {
+      x = x->left;
+    }
+    else
+    {
+      x = x->right;
+    }
   }
 
-  return curr;
+  return x;
 }
 
-MCLRBTreeNode *_mcl_rbtree_node_inorder_successor(MCLRBTreeNode *node)
+MCLRBTreeNode *_mcl_rbtree_minimum(MCLRBTree *tree, MCLRBTreeNode *node)
 {
-  MCLRBTreeNode *curr = node->right;
-  assert(curr);
-
-  while (curr->left)
+  while (node != tree->sentinel)
   {
-    curr = curr->left;
+    node = node->left;
+  }
+  return node;
+}
+
+void _mcl_rbtree_left_rotate(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *right_child = node->right;
+  node->right = right_child->left;
+
+  if (right_child->left != tree->sentinel)
+  {
+    right_child->left->parent = node;
   }
 
-  return curr;
-}
-
-// Return the uncle of a node.
-// For nodes with no uncles
-// it returns NULL.
-MCLRBTreeNode *_mcl_rbtree_node_uncle(MCLRBTreeNode *node)
-{
-  MCLRBTreeNode *gparent = _mcl_rbtree_node_grand_parent(node);
-
-  if (gparent)
+  if (node->parent == tree->sentinel)
   {
-    MCLRBTreeNode *parent = _mcl_rbtree_node_parent(node);
-    return (parent == gparent->left) ? (gparent->right) : (gparent->left);
+    tree->root = right_child;
+    right_child->parent = tree->sentinel;
+  }
+  else if (node == node->parent->left)
+  {
+    node->parent->left = right_child;
   }
   else
   {
-    return NULL;
+    node->parent->right = right_child;
   }
+
+  right_child->left = node;
+  right_child->parent = node->parent;
+  node->parent = right_child;
+
+  assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
 }
 
-MCLRBTreeNode * _mcl_rbtree_node_rotate_right(MCLRBTreeNode *node)
+void _mcl_rbtree_right_rotate(MCLRBTree *tree, MCLRBTreeNode *node)
 {
-  assert(node);
+  MCLRBTreeNode *left_child = node->left;
+  node->left = left_child->right;
 
-  MCLRBTreeNode *parent = node->parent;
-  MCLRBTreeNode *left_subtree = node->left;
-  MCLRBTreeNode *left_right_subtree = NULL;
-
-  if (left_subtree)
+  if (left_child->right != tree->sentinel)
   {
-    left_right_subtree = left_subtree->right;
+    left_child->right->parent = node;
   }
-
-  left_subtree->right = node;
-  node->left = left_right_subtree;
-
-  left_subtree->parent = parent;
-  if (left_right_subtree)
+  left_child->parent = node->parent;
+  if (node->parent == tree->sentinel)
   {
-    left_right_subtree->parent = node;
+    tree->root = left_child;
+    left_child->parent = tree->sentinel;
   }
-  node->parent = left_subtree;
+  else if (node == node->parent->right)
+  {
+    node->parent->right = left_child;
+  }
+  else
+  {
+    node->parent->left = left_child;
+  }
+  left_child->right = node;
+  left_child->parent = node->parent;
+  node->parent = left_child;
 
-  return left_subtree;
+  assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
 }
 
-MCLRBTreeNode * _mcl_rbtree_node_rotate_left(MCLRBTreeNode *node)
+void _mcl_rbtree_transplant(MCLRBTree *tree, MCLRBTreeNode *u, MCLRBTreeNode *v)
 {
-  assert(node);
-
-  MCLRBTreeNode *parent = node->parent;
-  MCLRBTreeNode *right_subtree = node->right;
-  MCLRBTreeNode *right_left_subtree = NULL;
-
-  if (right_subtree)
+  if (u->parent == tree->sentinel)
   {
-    right_left_subtree = right_subtree->left;
+    tree->root = v;
   }
-
-  right_subtree->left = node;
-  node->right = right_left_subtree;
-  
-  right_subtree->parent = parent;
-  if (right_left_subtree)
+  else if (u == u->parent->left)
   {
-    right_left_subtree->parent = node;
+    u->parent->left = v;
   }
-  node->parent = right_subtree;
-
-  return right_subtree;
+  else
+  {
+    u->parent->right = v;
+  }
+  v->parent = u->parent;
 }
 
 MCLRBTree *mcl_rbtree_create(MCLComparator cmp, void *user_data)
@@ -224,262 +171,289 @@ MCLRBTree *mcl_rbtree_create(MCLComparator cmp, void *user_data)
   MCLRBTree *tree = malloc(sizeof(MCLRBTree));
 
   tree->num_items = 0;
-  tree->root      = NULL;
   tree->cmp       = cmp;
   tree->user_data = user_data;
+
+  tree->sentinel  = malloc(sizeof(MCLRBTreeNode));
+
+  tree->sentinel->left   = tree->sentinel;
+  tree->sentinel->right  = tree->sentinel;
+  tree->sentinel->parent = tree->sentinel;
+  tree->sentinel->color  = MCL_RBTREE_NODE_BLACK;
+
+  tree->root = tree->sentinel;
 
   return tree;
 }
 
-// root is guranteed not to be NULL.
-void _mcl_rbtree_bst_insert(MCLRBTreeNode **root
-                           ,MCLRBTreeNode  *new_node
-                           ,MCLComparator   cmp
-                           ,void           *user_data
-                           ,MCLRBTreeNode  *parent)
+void _mcl_rbtree_insert_fixup(MCLRBTree *tree, MCLRBTreeNode *new_node)
 {
-  assert (NULL != root);
 
-  if (NULL == *root) {
-    *root = new_node;
-    new_node->parent = parent;
-    return;
+  MCLRBTreeNode *z = new_node;
+
+  while (z->parent->color == MCL_RBTREE_NODE_RED)
+  {
+    if (z->parent == z->parent->parent->left)
+    {
+      MCLRBTreeNode *y = z->parent->parent->right;
+      if (y->color == MCL_RBTREE_NODE_RED)
+      {
+        z->parent->color = MCL_RBTREE_NODE_BLACK;
+        y->color = MCL_RBTREE_NODE_BLACK;
+        z->parent->parent->color = MCL_RBTREE_NODE_RED;
+        z = z->parent->parent;
+      }
+      else
+      {
+        if (z == z->parent->right)
+        {
+          z = z->parent;
+          _mcl_rbtree_left_rotate(tree, z);
+        }
+        z->parent->color = MCL_RBTREE_NODE_BLACK;
+        z->parent->parent->color = MCL_RBTREE_NODE_RED;
+        _mcl_rbtree_right_rotate(tree, z->parent->parent);
+      }
+    }
+    else
+    {
+      MCLRBTreeNode *y = z->parent->parent->left;
+      if (y->color == MCL_RBTREE_NODE_RED)
+      {
+        z->parent->color = MCL_RBTREE_NODE_BLACK;
+        y->color = MCL_RBTREE_NODE_BLACK;
+        z->parent->parent->color = MCL_RBTREE_NODE_RED;
+        z = z->parent->parent;
+      }
+      else
+      {
+        if (z == z->parent->left)
+        {
+          z = z->parent;
+          _mcl_rbtree_right_rotate(tree, z);
+        }
+        z->parent->color = MCL_RBTREE_NODE_BLACK;
+        z->parent->parent->color = MCL_RBTREE_NODE_RED;
+        _mcl_rbtree_left_rotate(tree, z->parent->parent);
+      }
+    }
+
+    tree->sentinel->color = MCL_RBTREE_NODE_BLACK;
   }
 
-  if (cmp(new_node->data, (*root)->data, user_data) < 0)
+  tree->root->color = MCL_RBTREE_NODE_BLACK;
+
+  assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
+}
+
+void _mcl_rbtree_insert(MCLRBTree *tree, MCLRBTreeNode *new_node)
+{
+  MCLRBTreeNode *z = new_node;
+
+  MCLRBTreeNode *y = tree->sentinel;
+  MCLRBTreeNode *x = tree->root;
+
+  while (x != tree->sentinel)
   {
-    _mcl_rbtree_bst_insert(&(*root)->left, new_node, cmp, user_data, *root);
+    y = x;
+    if (tree->cmp(z->data, x->data, tree->user_data) < 0)
+    {
+      x = x->left;
+    }
+    else
+    {
+      x = x->right;
+    }
+  }
+  z->parent = y;
+  if (y == tree->sentinel)
+  {
+    tree->root = z;
+  }
+  else if (tree->cmp(z->data, x->data, tree->user_data) < 0)
+  {
+    y->left = z;
   }
   else
   {
-    _mcl_rbtree_bst_insert(&(*root)->right, new_node, cmp, user_data, *root);
+    y->right = z;
   }
+
+  z->left = tree->sentinel;
+  z->right = tree->sentinel;
+  z->color = MCL_RBTREE_NODE_RED;
+
+  _mcl_rbtree_insert_fixup(tree, z);
+
+  assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
 }
 
 void mcl_rbtree_insert(MCLRBTree *tree, MCLItemType item)
 {
   MCLRBTreeNode *new_node = malloc(sizeof(MCLRBTreeNode));
+  new_node->data = item;
 
-  new_node->data   = item;
-  new_node->parent = NULL;
-  new_node->left   = NULL;
-  new_node->right  = NULL;
-  new_node->color  = MCL_RBTREE_NODE_RED;
-
-  _mcl_rbtree_bst_insert(&tree->root
-                        ,new_node
-                        ,tree->cmp
-                        ,tree->user_data
-                        ,tree->root);
-
-  MCLRBTreeNode *new_subtree_root = NULL;
-
-  MCLRBTreeNode *up_one_node = _mcl_rbtree_rebalance_1(
-      new_node, &new_subtree_root);
-
-  assert(new_subtree_root);
-
-  if (NULL == up_one_node)
-  {
-    tree->root = new_subtree_root;
-  }
+  _mcl_rbtree_insert(tree, new_node);
 
   tree->num_items++;
+
+  assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
 }
 
-uint8_t mcl_rbtree_empty(MCLRBTree *tree)
+void _mcl_rbtree_delete_fixup(MCLRBTree *tree, MCLRBTreeNode *node)
 {
-  return (tree->num_items == 0);
-}
+  MCLRBTreeNode *x = node;
 
-MCLRBTreeNode *_mcl_rbtree_rebalance_1(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root)
-{
-  assert(node);
-  if (NULL == node->parent)
+  while (x != tree->root && x->color == MCL_RBTREE_NODE_BLACK)
   {
-    node->color = MCL_RBTREE_NODE_BLACK;
-    *new_subtree_root = node;
-    return node->parent;
+    if (x == x->parent->left)
+    {
+      MCLRBTreeNode *w = x->parent->right;
+      if (w->color == MCL_RBTREE_NODE_RED)
+      {
+        w->color = MCL_RBTREE_NODE_BLACK;
+        x->parent->color = MCL_RBTREE_NODE_RED;
+        _mcl_rbtree_left_rotate(tree, x->parent);
+        w = x->parent->right;
+      }
+      if (w->left->color == MCL_RBTREE_NODE_BLACK 
+          && w->right->color == MCL_RBTREE_NODE_BLACK)
+      {
+        w->color = MCL_RBTREE_NODE_RED;
+        x = x->parent;
+      }
+      else if (w->right->color == MCL_RBTREE_NODE_BLACK)
+      {
+        w->left->color = MCL_RBTREE_NODE_BLACK;
+        w->color = MCL_RBTREE_NODE_RED;
+        _mcl_rbtree_right_rotate(tree, w);
+        w = x->parent->right;
+      }
+
+      w->color = x->parent->color;
+      x->parent->color = MCL_RBTREE_NODE_BLACK;
+      w->right->color = MCL_RBTREE_NODE_BLACK;
+      _mcl_rbtree_left_rotate(tree, x->parent);
+      x = tree->root;
+    }
+    else
+    {
+      MCLRBTreeNode *w = x->parent->left;
+      if (w->color == MCL_RBTREE_NODE_RED)
+      {
+        w->color = MCL_RBTREE_NODE_BLACK;
+        x->parent->color = MCL_RBTREE_NODE_RED;
+        _mcl_rbtree_right_rotate(tree, x->parent);
+        w = x->parent->left;
+      }
+      if (w->right->color == MCL_RBTREE_NODE_BLACK 
+          && w->left->color == MCL_RBTREE_NODE_BLACK)
+      {
+        w->color = MCL_RBTREE_NODE_RED;
+        x = x->parent;
+      }
+      else if (w->left->color == MCL_RBTREE_NODE_BLACK)
+      {
+        w->right->color = MCL_RBTREE_NODE_BLACK;
+        w->color = MCL_RBTREE_NODE_RED;
+        _mcl_rbtree_left_rotate(tree, w);
+        w = x->parent->left;
+      }
+
+      w->color = x->parent->color;
+      x->parent->color = MCL_RBTREE_NODE_BLACK;
+      w->left->color = MCL_RBTREE_NODE_BLACK;
+      _mcl_rbtree_right_rotate(tree, x->parent);
+      x = tree->root;
+    }
+  }
+
+  x->color = MCL_RBTREE_NODE_BLACK;
+}
+
+void _mcl_rbtree_delete(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *z = node;
+
+  MCLRBTreeNode *y = z;
+  MCLRBTreeNode *x = NULL;
+  MCLRBTreeNodeColor y_orig_color = y->color;
+
+  if (z->left == tree->sentinel)
+  {
+    x = z->right;
+    _mcl_rbtree_transplant(tree, z, z->right);
+  }
+  else if (z->right == tree->sentinel)
+  {
+    x = z->left;
+    _mcl_rbtree_transplant(tree, z, z->left);
   }
   else
   {
-    return _mcl_rbtree_rebalance_2(node, new_subtree_root);
-  }
-}
+    y = _mcl_rbtree_minimum(tree, z->right);
+    x = y->right;
 
-MCLRBTreeNode *_mcl_rbtree_rebalance_2(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root)
-{
-  assert(node);
-  if (_mcl_rbtree_node_color(
-        _mcl_rbtree_node_parent(node)) == MCL_RBTREE_NODE_BLACK)
-  {
-    *new_subtree_root = node;
-    return node->parent;
-  }
-  else
-  {
-    return _mcl_rbtree_rebalance_3(node, new_subtree_root);
-  }
-}
+    if (y->parent == z)
+    {
+      x->parent = y;
+    }
+    else
+    {
+      _mcl_rbtree_transplant(tree, y, y->right);
+      y->right = z->right;
+      y->right->parent = y;
+    }
 
-MCLRBTreeNode *_mcl_rbtree_rebalance_3(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root)
-{
-  MCLRBTreeNode *uncle = _mcl_rbtree_node_uncle(node);
-  MCLRBTreeNode *gparent = _mcl_rbtree_node_grand_parent(node);
-
-  assert(gparent);
-
-  if ((NULL != uncle) && (MCL_RBTREE_NODE_RED == uncle->color))
-  {
-    node->parent->color = MCL_RBTREE_NODE_BLACK;
-    uncle->color = MCL_RBTREE_NODE_BLACK;
-
-    gparent->color = MCL_RBTREE_NODE_RED;
-
-    return _mcl_rbtree_rebalance_1(gparent, new_subtree_root);
-  }
-  else
-  {
-    return _mcl_rbtree_rebalance_4(node, new_subtree_root);
-  }
-}
-
-MCLRBTreeNode *_mcl_rbtree_rebalance_4(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root)
-{
-  MCLRBTreeNode *gparent = _mcl_rbtree_node_grand_parent(node);
-  MCLRBTreeNode *parent = _mcl_rbtree_node_parent(node);
-  
-  assert(gparent);
-  assert(parent);
-
-  if ((node == parent->right) && (parent == gparent->left))
-  {
-    parent->right = _mcl_rbtree_node_rotate_left(parent);
-    node = node->left;
-  }
-  else if ((node == parent->left) && (parent == gparent->right))
-  {
-    parent->left = _mcl_rbtree_node_rotate_right(parent);
-    node = node->right;
+    _mcl_rbtree_transplant(tree, z, y);
+    y->left = z->left;
+    y->left->parent = y;
+    y->color = z->color;
   }
 
-  return _mcl_rbtree_rebalance_5(node, new_subtree_root);
-}
-
-MCLRBTreeNode *_mcl_rbtree_rebalance_5(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root)
-{
-  MCLRBTreeNode *gparent = _mcl_rbtree_node_grand_parent(node);
-  MCLRBTreeNode *parent  = _mcl_rbtree_node_parent(node);
-
-  assert(gparent);
-  assert(parent);
-
-  parent->color = MCL_RBTREE_NODE_BLACK;
-  gparent->color = MCL_RBTREE_NODE_RED;
-
-  MCLRBTreeNode *parent_gparent = _mcl_rbtree_node_parent(gparent);
-  int gparent_direction = 0;
-
-  if (parent_gparent && parent_gparent->left == gparent)
+  if (y_orig_color == MCL_RBTREE_NODE_BLACK)
   {
-    gparent_direction = -1;
-  }
-  else if (parent_gparent && parent_gparent->right == gparent)
-  {
-    gparent_direction = 1;
-  }
-
-  MCLRBTreeNode *new_root = NULL;
-  if (node == parent->left)
-  {
-    new_root = _mcl_rbtree_node_rotate_right(gparent);
-  }
-  else
-  {
-    new_root = _mcl_rbtree_node_rotate_left(gparent);
-  }
-
-  assert(new_root);
-
-  if (gparent_direction < 0)
-  {
-    parent_gparent->left = new_root;
-  }
-  else if (gparent_direction > 0)
-  {
-    parent_gparent->right = new_root;
-  }
-
-  *new_subtree_root = new_root;
-  return parent_gparent;
-}
-
-MCLRBTreeNode *_mcl_rbtree_find_node(MCLRBTreeNode *root
-                                    ,MCLItemType item
-                                    ,MCLComparator cmp
-                                    ,void *user_data)
-{
-  if (root->data == item || !root)
-  {
-    return root;
-  }
-
-  if (cmp(item, root->data, user_data) < 0)
-  {
-    return _mcl_rbtree_find_node(root->left, item, cmp, user_data);
-  }
-  else
-  {
-    return _mcl_rbtree_find_node(root->right, item, cmp, user_data);
+    _mcl_rbtree_delete_fixup(tree, x);
   }
 }
 
 uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item)
 {
-  MCLRBTreeNode *node_to_delete
-    = _mcl_rbtree_find_node(tree->root, item, tree->cmp, tree->user_data);
+  MCLRBTreeNode *node_to_delete = _mcl_rbtree_node_find(tree, item);  
+  tree->num_items--;
 
-  if (node_to_delete)
-  {
-    if (node_to_delete->left && node_to_delete->right)
-    {
-      // Replace inorder successor with node_to_delete
-      MCLRBTreeNode *succ  = _mcl_rbtree_node_inorder_successor(node_to_delete);
-      MCLItemType    temp  = succ->data;
-      succ->data           = node_to_delete->data;
-      node_to_delete->data = temp;
-
-      node_to_delete       = succ;
-    }
-
-    MCLRBTreeNode *new_subtree_root = NULL;
-
-    MCLRBTreeNode *up_one_node
-      = _mcl_rbtree_delete_node_with_one_child(
-          node_to_delete, &new_subtree_root);
-
-    if (NULL == up_one_node)
-    {
-      tree->root = new_subtree_root;
-    }
-
-    return 0;
-  }
-  else
+  if (node_to_delete == tree->sentinel)
   {
     return 1;
   }
+  else
+  {
+    _mcl_rbtree_delete(tree, node_to_delete);
+    free(node_to_delete);
+    assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
+    return 0;
+  }
 }
 
-MCLRBTreeNode *_mcl_rbtree_delete_node_with_one_child(
-    MCLRBTreeNode *node, MCLRBTreeNode **new_subtree_root)
+void _mcl_rbtree_delete_root(MCLRBTree *tree)
 {
-  // Precondition, node has at most one
-  // non-NULL children.
-  assert(!(node->left && node->right));
+  MCLItemType item = tree->root->data;
+
+  mcl_rbtree_delete(tree, item);
+}
+
+void mcl_rbtree_destroy(MCLRBTree *tree)
+{
+  while (tree->root != tree->sentinel)
+  {
+    _mcl_rbtree_delete_root(tree);
+  }
+
+  free(tree->sentinel);
+  free(tree);
+}
+
+uint8_t mcl_rbtree_empty(MCLRBTree *tree)
+{
+  return (tree->num_items == 0);
 }
