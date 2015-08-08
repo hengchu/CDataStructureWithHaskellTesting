@@ -37,7 +37,7 @@ instance Arbitrary CIntPtr where
 ----------------------------------------------------------
 
 main :: IO ()
-main = quickCheckWith stdArgs{ maxSize=100, maxSuccess=50 } $ 
+main = quickCheckWith stdArgs{ maxSize=100, maxSuccess=500 } $ 
   prop_listAddItemWillIncrementNumItems
     .&&. prop_listShouldHaveCorrectLength
     .&&. prop_emptyListShouldNotHaveAnything

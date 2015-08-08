@@ -270,7 +270,7 @@ void _mcl_rbtree_insert(MCLRBTree *tree, MCLRBTreeNode *new_node)
   {
     tree->root = z;
   }
-  else if (tree->cmp(z->data, x->data, tree->user_data) < 0)
+  else if (tree->cmp(z->data, y->data, tree->user_data) < 0)
   {
     y->left = z;
   }
@@ -366,6 +366,7 @@ void _mcl_rbtree_delete_fixup(MCLRBTree *tree, MCLRBTreeNode *node)
       _mcl_rbtree_right_rotate(tree, x->parent);
       x = tree->root;
     }
+
   }
 
   x->color = MCL_RBTREE_NODE_BLACK;
@@ -376,7 +377,7 @@ void _mcl_rbtree_delete(MCLRBTree *tree, MCLRBTreeNode *node)
   MCLRBTreeNode *z = node;
 
   MCLRBTreeNode *y = z;
-  MCLRBTreeNode *x = NULL;
+  MCLRBTreeNode *x = tree->sentinel;
   MCLRBTreeNodeColor y_orig_color = y->color;
 
   if (z->left == tree->sentinel)
@@ -392,6 +393,7 @@ void _mcl_rbtree_delete(MCLRBTree *tree, MCLRBTreeNode *node)
   else
   {
     y = _mcl_rbtree_minimum(tree, z->right);
+    y_orig_color = y->color;
     x = y->right;
 
     if (y->parent == z)
@@ -415,12 +417,13 @@ void _mcl_rbtree_delete(MCLRBTree *tree, MCLRBTreeNode *node)
   {
     _mcl_rbtree_delete_fixup(tree, x);
   }
+
+  tree->sentinel->parent = tree->sentinel;
 }
 
 uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item)
 {
   MCLRBTreeNode *node_to_delete = _mcl_rbtree_node_find(tree, item);  
-  tree->num_items--;
 
   if (node_to_delete == tree->sentinel)
   {
@@ -428,6 +431,7 @@ uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item)
   }
   else
   {
+    tree->num_items--;
     _mcl_rbtree_delete(tree, node_to_delete);
     free(node_to_delete);
     assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
@@ -456,4 +460,22 @@ void mcl_rbtree_destroy(MCLRBTree *tree)
 uint8_t mcl_rbtree_empty(MCLRBTree *tree)
 {
   return (tree->num_items == 0);
+}
+
+uint32_t _mcl_rbtree_depth(MCLRBTree *tree, MCLRBTreeNode *root)
+{
+  if (root == tree->sentinel)
+  {
+    return 0;
+  }
+
+  uint32_t left_depth = _mcl_rbtree_depth(tree, root->left);
+  uint32_t right_depth = _mcl_rbtree_depth(tree, root->right);
+
+  return 1 + ((left_depth > right_depth) ? left_depth : right_depth);
+}
+
+uint32_t mcl_rbtree_depth(MCLRBTree *tree)
+{
+  return _mcl_rbtree_depth(tree, tree->root);
 }
