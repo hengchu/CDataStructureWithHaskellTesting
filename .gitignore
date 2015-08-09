@@ -1,5 +1,13 @@
 *.o
 rbtree_main
+list_main
 *_stub.h
 *.swp
 *.dSYM
+*.hi
+*.plist
+MCLList.hs
+MCLRBTree.hs
+*.a
+*.txt
+*Test

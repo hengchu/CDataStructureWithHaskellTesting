@@ -36,3 +36,5 @@ clean:
 	rm -f MCLRBTree.hs
 	rm -f MCLRBTreeTest
 	rm -f *.a
+	rm -f list_main
+	rm -rf rbtree_main
