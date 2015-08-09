@@ -3,12 +3,14 @@
 #ifndef KERNEL
 #include <stdlib.h>
 #include <assert.h>
+#include <stdio.h>
 #endif
 
 #ifdef KERNEL
-#define malloc k_malloc
-#define free   k_free
-#define assert k_assert
+#define malloc  k_malloc
+#define realloc k_realloc
+#define free    k_free
+#define assert  k_assert
 #endif
 
 typedef enum {
@@ -35,7 +37,6 @@ struct MCLRBTree {
   // This function pointer is used to order
   // tree elements.
   MCLComparator  cmp;
-  //
   // This field is passed to the comparator.
   void          *user_data;
 };
@@ -55,6 +56,121 @@ int _mcl_rbtree_validate_pointers(
       && _mcl_rbtree_validate_pointers(tree, node->left, node)
       && _mcl_rbtree_validate_pointers(tree, node->right, node);
   }
+}
+
+int _mcl_rbtree_verify_property1_helper(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  if (node == tree->sentinel)
+  {
+    return node->color == MCL_RBTREE_NODE_BLACK;
+  }
+
+  int rc = node->color == MCL_RBTREE_NODE_BLACK ||
+           node->color == MCL_RBTREE_NODE_RED;
+
+  return rc && _mcl_rbtree_verify_property1_helper(tree, node->left) &&
+               _mcl_rbtree_verify_property1_helper(tree, node->right);
+}
+
+int _mcl_rbtree_verify_property1(MCLRBTree *tree)
+{
+  return _mcl_rbtree_verify_property1_helper(tree, tree->root);
+}
+
+int _mcl_rbtree_verify_property2(MCLRBTree *tree)
+{
+  return tree->root->color == MCL_RBTREE_NODE_BLACK;
+}
+
+int _mcl_rbtree_verify_property3(MCLRBTree *tree)
+{
+  return tree->sentinel->color == MCL_RBTREE_NODE_BLACK;
+}
+
+int _mcl_rbtree_verify_property4_helper(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  if (node->color == MCL_RBTREE_NODE_RED)
+  {
+    int rc = node->left->color == MCL_RBTREE_NODE_BLACK &&
+             node->right->color == MCL_RBTREE_NODE_BLACK;
+
+    return rc && _mcl_rbtree_verify_property4_helper(tree, node->left) &&
+                 _mcl_rbtree_verify_property4_helper(tree, node->right);
+  }
+  else if (node != tree->sentinel)
+  {
+    return _mcl_rbtree_verify_property4_helper(tree, node->left) &&
+           _mcl_rbtree_verify_property4_helper(tree, node->right);
+  }
+  else
+  {
+    return 1;
+  }
+}
+
+int _mcl_rbtree_verify_property4(MCLRBTree *tree)
+{
+  return _mcl_rbtree_verify_property4_helper(tree, tree->root);
+}
+
+// returns the number of black nodes of all paths starting from this node
+// to nil descendants.
+void _mcl_rbtree_verify_property5_helper(MCLRBTree *tree
+                                        ,MCLRBTreeNode *node
+                                        ,uint32_t *num_paths
+                                        ,uint32_t **lengths
+                                        ,uint32_t current_length)
+{
+  // Base case
+  if (node == tree->sentinel)
+  {
+    *num_paths          += 1;
+    *lengths             = realloc(*lengths, *num_paths * sizeof(uint32_t));
+    *lengths[*num_paths-1] = current_length + 1;
+    return;
+  }
+
+  if (node->color == MCL_RBTREE_NODE_BLACK)
+  {
+    _mcl_rbtree_verify_property5_helper(
+        tree, node->left, num_paths, lengths, current_length+1);
+  }
+  else
+  {
+    _mcl_rbtree_verify_property5_helper(
+        tree, node->right, num_paths, lengths, current_length);
+  }
+}
+
+int _mcl_rbtree_verify_property5(MCLRBTree *tree)
+{
+  uint32_t num_paths = 0;
+  uint32_t *lengths  = NULL;
+
+  _mcl_rbtree_verify_property5_helper(
+      tree, tree->root, &num_paths, &lengths, 0);
+
+  int retval = 1;
+  for (uint32_t i = 0; i < num_paths; i++)
+  {
+    if (lengths[i] != lengths[0])
+    {
+      retval = 1;
+      break;
+    }
+  }
+
+  free(lengths);
+  return retval;
+}
+
+int _mcl_rbtree_verify(MCLRBTree *tree)
+{
+  return _mcl_rbtree_verify_property1(tree) &&
+         _mcl_rbtree_verify_property2(tree) &&
+         _mcl_rbtree_verify_property3(tree) &&
+         _mcl_rbtree_verify_property4(tree) &&
+         _mcl_rbtree_verify_property5(tree);
 }
 
 MCLRBTreeNode *_mcl_rbtree_node_find(MCLRBTree *tree, MCLItemType item)
@@ -81,7 +197,7 @@ MCLRBTreeNode *_mcl_rbtree_node_find(MCLRBTree *tree, MCLItemType item)
 
 MCLRBTreeNode *_mcl_rbtree_minimum(MCLRBTree *tree, MCLRBTreeNode *node)
 {
-  while (node != tree->sentinel)
+  while (node->left != tree->sentinel)
   {
     node = node->left;
   }
@@ -298,127 +414,212 @@ void mcl_rbtree_insert(MCLRBTree *tree, MCLItemType item)
   tree->num_items++;
 
   assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
+  assert(_mcl_rbtree_verify(tree));
 }
 
+void _mcl_rbtree_delete_case1(MCLRBTree *tree, MCLRBTreeNode *node);
+void _mcl_rbtree_delete_case2(MCLRBTree *tree, MCLRBTreeNode *node);
+void _mcl_rbtree_delete_case3(MCLRBTree *tree, MCLRBTreeNode *node);
+void _mcl_rbtree_delete_case4(MCLRBTree *tree, MCLRBTreeNode *node);
+void _mcl_rbtree_delete_case5(MCLRBTree *tree, MCLRBTreeNode *node);
+void _mcl_rbtree_delete_case6(MCLRBTree *tree, MCLRBTreeNode *node);
+
+MCLRBTreeNode *_mcl_rbtree_sibling(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  if (node == node->parent->left)
+  {
+    return node->parent->right;
+  }
+  else
+  {
+    return node->parent->left;
+  }
+}
+
+//reference: https://en.wikipedia.org/wiki/Red%E2%80%93black_tree#Removal
 void _mcl_rbtree_delete_fixup(MCLRBTree *tree, MCLRBTreeNode *node)
 {
-  MCLRBTreeNode *x = node;
+  _mcl_rbtree_delete_case1(tree, node);
 
-  while (x != tree->root && x->color == MCL_RBTREE_NODE_BLACK)
+  tree->root->color = MCL_RBTREE_NODE_BLACK;
+
+  tree->sentinel->color = MCL_RBTREE_NODE_BLACK;
+  tree->sentinel->parent = tree->sentinel;
+  tree->sentinel->left = tree->sentinel;
+  tree->sentinel->right = tree->sentinel;
+
+}
+
+void _mcl_rbtree_delete_case1(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  tree->sentinel->color = MCL_RBTREE_NODE_BLACK;
+  if (node != tree->root)
   {
-    if (x == x->parent->left)
-    {
-      MCLRBTreeNode *w = x->parent->right;
-      if (w->color == MCL_RBTREE_NODE_RED)
-      {
-        w->color = MCL_RBTREE_NODE_BLACK;
-        x->parent->color = MCL_RBTREE_NODE_RED;
-        _mcl_rbtree_left_rotate(tree, x->parent);
-        w = x->parent->right;
-      }
-      if (w->left->color == MCL_RBTREE_NODE_BLACK 
-          && w->right->color == MCL_RBTREE_NODE_BLACK)
-      {
-        w->color = MCL_RBTREE_NODE_RED;
-        x = x->parent;
-      }
-      else if (w->right->color == MCL_RBTREE_NODE_BLACK)
-      {
-        w->left->color = MCL_RBTREE_NODE_BLACK;
-        w->color = MCL_RBTREE_NODE_RED;
-        _mcl_rbtree_right_rotate(tree, w);
-        w = x->parent->right;
-      }
+    _mcl_rbtree_delete_case2(tree, node);
+  }
+}
 
-      w->color = x->parent->color;
-      x->parent->color = MCL_RBTREE_NODE_BLACK;
-      w->right->color = MCL_RBTREE_NODE_BLACK;
-      _mcl_rbtree_left_rotate(tree, x->parent);
-      x = tree->root;
+void _mcl_rbtree_delete_case2(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *sibling = _mcl_rbtree_sibling(tree, node);
+
+  if (sibling->color == MCL_RBTREE_NODE_RED)
+  {
+    node->parent->color = MCL_RBTREE_NODE_RED;
+    sibling->color = MCL_RBTREE_NODE_BLACK;
+    if (node == node->parent->left)
+    {
+      _mcl_rbtree_left_rotate(tree, node->parent);
     }
     else
     {
-      MCLRBTreeNode *w = x->parent->left;
-      if (w->color == MCL_RBTREE_NODE_RED)
-      {
-        w->color = MCL_RBTREE_NODE_BLACK;
-        x->parent->color = MCL_RBTREE_NODE_RED;
-        _mcl_rbtree_right_rotate(tree, x->parent);
-        w = x->parent->left;
-      }
-      if (w->right->color == MCL_RBTREE_NODE_BLACK 
-          && w->left->color == MCL_RBTREE_NODE_BLACK)
-      {
-        w->color = MCL_RBTREE_NODE_RED;
-        x = x->parent;
-      }
-      else if (w->left->color == MCL_RBTREE_NODE_BLACK)
-      {
-        w->right->color = MCL_RBTREE_NODE_BLACK;
-        w->color = MCL_RBTREE_NODE_RED;
-        _mcl_rbtree_left_rotate(tree, w);
-        w = x->parent->left;
-      }
-
-      w->color = x->parent->color;
-      x->parent->color = MCL_RBTREE_NODE_BLACK;
-      w->left->color = MCL_RBTREE_NODE_BLACK;
-      _mcl_rbtree_right_rotate(tree, x->parent);
-      x = tree->root;
+      _mcl_rbtree_right_rotate(tree, node->parent);
     }
-
   }
 
-  x->color = MCL_RBTREE_NODE_BLACK;
+  _mcl_rbtree_delete_case3(tree, node);
+}
+
+void _mcl_rbtree_delete_case3(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *sibling = _mcl_rbtree_sibling(tree, node);
+
+  if (node->parent->color == MCL_RBTREE_NODE_BLACK &&
+      sibling->color == MCL_RBTREE_NODE_BLACK &&
+      sibling->left->color == MCL_RBTREE_NODE_BLACK &&
+      sibling->right->color == MCL_RBTREE_NODE_BLACK)
+  {
+    sibling->color = MCL_RBTREE_NODE_RED;
+    _mcl_rbtree_delete_case1(tree, node->parent);
+  }
+  else
+  {
+    _mcl_rbtree_delete_case4(tree, node);
+  }
+}
+
+void _mcl_rbtree_delete_case4(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *sibling = _mcl_rbtree_sibling(tree, node);
+
+  if (node->parent->color == MCL_RBTREE_NODE_RED &&
+      sibling->color == MCL_RBTREE_NODE_BLACK &&
+      sibling->left->color == MCL_RBTREE_NODE_BLACK &&
+      sibling->right->color == MCL_RBTREE_NODE_BLACK)
+  {
+    sibling->color = MCL_RBTREE_NODE_RED;
+    node->parent->color = MCL_RBTREE_NODE_BLACK;
+  }
+  else
+  {
+    _mcl_rbtree_delete_case5(tree, node);
+  }
+}
+
+void _mcl_rbtree_delete_case5(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *sibling = _mcl_rbtree_sibling(tree, node);
+
+  if (sibling->color == MCL_RBTREE_NODE_BLACK)
+  {
+    if (node == node->parent->left &&
+        sibling->right->color == MCL_RBTREE_NODE_BLACK &&
+        sibling->left->color == MCL_RBTREE_NODE_RED)
+    {
+      sibling->color = MCL_RBTREE_NODE_RED;
+      sibling->left->color = MCL_RBTREE_NODE_BLACK;
+      _mcl_rbtree_right_rotate(tree, sibling);
+    }
+    else if (node == node->parent->right &&
+             sibling->left->color == MCL_RBTREE_NODE_BLACK &&
+             sibling->right->color == MCL_RBTREE_NODE_RED)
+    {
+      sibling->color = MCL_RBTREE_NODE_RED;
+      sibling->right->color = MCL_RBTREE_NODE_BLACK;
+      _mcl_rbtree_left_rotate(tree, sibling);
+    }
+  }
+
+  _mcl_rbtree_delete_case6(tree, node);
+}
+
+void _mcl_rbtree_delete_case6(MCLRBTree *tree, MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *sibling = _mcl_rbtree_sibling(tree, node);
+
+  sibling->color = node->parent->color;
+  node->parent->color = MCL_RBTREE_NODE_BLACK;
+
+  if (node == node->parent->left)
+  {
+    sibling->right->color = MCL_RBTREE_NODE_BLACK;
+    _mcl_rbtree_left_rotate(tree, node->parent);
+  }
+  else
+  {
+    sibling->left->color = MCL_RBTREE_NODE_BLACK;
+    _mcl_rbtree_right_rotate(tree, node->parent);
+  }
+
+}
+
+void _mcl_rbtree_delete_node_with_one_child(MCLRBTree *tree
+                                           ,MCLRBTreeNode *node)
+{
+  MCLRBTreeNode *child = tree->sentinel;
+
+  if (node->left == tree->sentinel)
+  {
+    child = node->right;
+  }
+  else if (node->right == tree->sentinel)
+  {
+    child = node->left;
+  }
+
+  if (node == tree->root)
+  {
+    tree->root = child;
+  }
+  else if (node->parent->left == node)
+  {
+    node->parent->left = child;
+  }
+  else
+  {
+    node->parent->right = child;
+  }
+
+  child->parent = node->parent;
+
+  if (node->color == MCL_RBTREE_NODE_BLACK)
+  {
+    if (child->color == MCL_RBTREE_NODE_RED)
+    {
+      child->color = MCL_RBTREE_NODE_BLACK;
+    }
+    else
+    {
+      printf("calling fixup\n");
+      _mcl_rbtree_delete_fixup(tree, child);
+    }
+  }
 }
 
 void _mcl_rbtree_delete(MCLRBTree *tree, MCLRBTreeNode *node)
 {
-  MCLRBTreeNode *z = node;
-
-  MCLRBTreeNode *y = z;
-  MCLRBTreeNode *x = tree->sentinel;
-  MCLRBTreeNodeColor y_orig_color = y->color;
-
-  if (z->left == tree->sentinel)
+  if (node->left != tree->sentinel &&
+      node->right != tree->sentinel)
   {
-    x = z->right;
-    _mcl_rbtree_transplant(tree, z, z->right);
-  }
-  else if (z->right == tree->sentinel)
-  {
-    x = z->left;
-    _mcl_rbtree_transplant(tree, z, z->left);
-  }
-  else
-  {
-    y = _mcl_rbtree_minimum(tree, z->right);
-    y_orig_color = y->color;
-    x = y->right;
+    MCLRBTreeNode *successor = _mcl_rbtree_minimum(tree, node->right);
+    MCLItemType temp = node->data;
+    node->data = successor->data;
+    successor->data = temp;
 
-    if (y->parent == z)
-    {
-      x->parent = y;
-    }
-    else
-    {
-      _mcl_rbtree_transplant(tree, y, y->right);
-      y->right = z->right;
-      y->right->parent = y;
-    }
-
-    _mcl_rbtree_transplant(tree, z, y);
-    y->left = z->left;
-    y->left->parent = y;
-    y->color = z->color;
+    node = successor;
   }
 
-  if (y_orig_color == MCL_RBTREE_NODE_BLACK)
-  {
-    _mcl_rbtree_delete_fixup(tree, x);
-  }
-
-  tree->sentinel->parent = tree->sentinel;
+  _mcl_rbtree_delete_node_with_one_child(tree, node);
 }
 
 uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item)
@@ -433,8 +634,12 @@ uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item)
   {
     tree->num_items--;
     _mcl_rbtree_delete(tree, node_to_delete);
+
     free(node_to_delete);
+
     assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
+    assert(_mcl_rbtree_verify(tree));
+
     return 0;
   }
 }

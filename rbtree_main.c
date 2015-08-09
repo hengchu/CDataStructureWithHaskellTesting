@@ -12,11 +12,13 @@ int main(int argc, char *argv[])
 
   int num_items = sizeof(data) / sizeof(*data);
 
-  for (int i = 0; i < 2; i++)
+  for (int i = 0; i < num_items; i++)
   {
     mcl_rbtree_insert(tree, data[i]);
     assert(!mcl_rbtree_empty(tree));
   }
+
+  printf("tree depth: %d\n", mcl_rbtree_depth(tree));
 
   //for (int i = 0; i < num_items; i++)
   //{
@@ -24,4 +26,6 @@ int main(int argc, char *argv[])
   //}
 
   mcl_rbtree_destroy(tree);
+
+  return 0;
 }
