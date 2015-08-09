@@ -18,6 +18,8 @@ typedef struct MCLRBTree MCLRBTree;
 // comparator.
 MCLRBTree *mcl_rbtree_create(MCLComparator cmp, void *user_data);
 
+MCLRBTree *mcl_rbtree_create_default();
+
 // Destroy this tree.
 // Note that it does not free any
 // element stored in this tree.
@@ -42,5 +44,10 @@ uint32_t mcl_rbtree_num_items(MCLRBTree *tree);
 // Note that the depth of an empty tree
 // is defined to be 0.
 uint32_t mcl_rbtree_depth(MCLRBTree *tree);
+
+// Applies the visitor through the rbtree pre-order.
+void mcl_rbtree_visit_pre_order(MCLRBTree *tree
+                               ,MCLVisitor visitor
+                               ,void *user_data);
 
 #endif

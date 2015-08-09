@@ -19,6 +19,9 @@ typedef int (*MCLPredicate) (MCLItemType, void *);
 // user data.
 typedef int (*MCLComparator) (MCLItemType, MCLItemType, void *);
 
+// A visitor used to traverse the data structures.
+typedef void (*MCLVisitor) (MCLItemType, void *);
+
 // This default comparator simply compares the two elements
 // with operator '<'. It ignores the user_data argument.
 int mcl_default_comparator(MCLItemType left

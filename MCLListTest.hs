@@ -4,8 +4,9 @@ import Test.QuickCheck.Monadic
 import Data.Maybe (isJust, fromJust)
 
 import Foreign.C.Types
-import Data.Word
 import Data.List (sort)
+
+import ArbitraryInstances ()
 
 listInsertHelper :: MCLListH -> [CIntPtr] -> IO ()
 listInsertHelper _ [] = return ()
@@ -29,11 +30,6 @@ genRandomList = do
   listInsertHelper list ints
   return list
 
-instance Arbitrary CIntPtr where
-  arbitrary = do
-    int <- arbitrary :: Gen Word
-    return $ fromIntegral int
-
 ----------------------------------------------------------
 
 main :: IO ()
@@ -56,12 +52,12 @@ main = quickCheckWith stdArgs{ maxSize=100, maxSuccess=500 } $
     .&&. prop_listSortShouldSort
     .&&. prop_listRevSortShouldRevSort
 
-prop_listAddItemWillIncrementNumItems :: Int -> Property
+prop_listAddItemWillIncrementNumItems :: CIntPtr -> Property
 prop_listAddItemWillIncrementNumItems item =
   monadicIO $ do
     list <- run genRandomList
     oldSize <- run $ listNumItems list
-    run $ listAppendFront list (fromIntegral item)
+    run $ listAppendFront list item
     newSize <- run $ listNumItems list
     assert (oldSize +1 == newSize)
 
@@ -76,7 +72,7 @@ prop_listShouldHaveCorrectLength items =
     size <- run $ listNumItems list
     assert (size == n + oldSize)
 
-prop_emptyListShouldNotHaveAnything :: Int -> Property
+prop_emptyListShouldNotHaveAnything :: CIntPtr -> Property
 prop_emptyListShouldNotHaveAnything item =
   monadicIO $ do
     list <- run newList
@@ -85,12 +81,12 @@ prop_emptyListShouldNotHaveAnything item =
     isIn <- run $ listInList list (fromIntegral item)
     assert (not isIn)
 
-prop_itemJustAddedShouldBeInList :: Int -> Property
+prop_itemJustAddedShouldBeInList :: CIntPtr -> Property
 prop_itemJustAddedShouldBeInList item =
   monadicIO $ do
     list <- run genRandomList
-    run $ listAppendFront list (fromIntegral item)
-    isIn <- run $ listInList list (fromIntegral item)
+    run $ listAppendFront list item
+    isIn <- run $ listInList list item
     assert isIn
 
 prop_emptyListShouldHaveNoHead :: Property
@@ -139,17 +135,17 @@ prop_valueJustAppendShouldExistWithPredicate item = do
   monadicIO $ do
     list <- run newList
     run $ listAppendFront list item
-    let pred = \v _ -> if v == item then 1 else 0
-    isIn <- run $ listInListIf list pred 0
+    let predicate = \v _ -> if v == item then 1 else 0
+    isIn <- run $ listInListIf list predicate 0
     assert isIn
 
 prop_headShouldBeSameAsZerothItem :: Property
 prop_headShouldBeSameAsZerothItem = do
   monadicIO $ do
     list <- run genRandomList
-    head <- run $ listHead list
+    headOfList <- run $ listHead list
     zeroth <- run $ listNthItem list 0
-    assert (head == zeroth)
+    assert (headOfList == zeroth)
 
 prop_nthOutOfBoundsShouldFail :: Property
 prop_nthOutOfBoundsShouldFail = do

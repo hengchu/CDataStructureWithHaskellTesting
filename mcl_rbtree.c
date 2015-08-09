@@ -232,7 +232,9 @@ void _mcl_rbtree_left_rotate(MCLRBTree *tree, MCLRBTreeNode *node)
   right_child->parent = node->parent;
   node->parent = right_child;
 
+#ifdef DEBUG
   assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
+#endif
 }
 
 void _mcl_rbtree_right_rotate(MCLRBTree *tree, MCLRBTreeNode *node)
@@ -262,7 +264,9 @@ void _mcl_rbtree_right_rotate(MCLRBTree *tree, MCLRBTreeNode *node)
   left_child->parent = node->parent;
   node->parent = left_child;
 
+#ifdef DEBUG
   assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
+#endif
 }
 
 void _mcl_rbtree_transplant(MCLRBTree *tree, MCLRBTreeNode *u, MCLRBTreeNode *v)
@@ -300,6 +304,11 @@ MCLRBTree *mcl_rbtree_create(MCLComparator cmp, void *user_data)
   tree->root = tree->sentinel;
 
   return tree;
+}
+
+MCLRBTree *mcl_rbtree_create_default()
+{
+  return mcl_rbtree_create(mcl_default_comparator, NULL);
 }
 
 void _mcl_rbtree_insert_fixup(MCLRBTree *tree, MCLRBTreeNode *new_node)
@@ -359,7 +368,9 @@ void _mcl_rbtree_insert_fixup(MCLRBTree *tree, MCLRBTreeNode *new_node)
 
   tree->root->color = MCL_RBTREE_NODE_BLACK;
 
+#ifdef DEBUG
   assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
+#endif
 }
 
 void _mcl_rbtree_insert(MCLRBTree *tree, MCLRBTreeNode *new_node)
@@ -401,7 +412,9 @@ void _mcl_rbtree_insert(MCLRBTree *tree, MCLRBTreeNode *new_node)
 
   _mcl_rbtree_insert_fixup(tree, z);
 
+#ifdef DEBUG
   assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
+#endif
 }
 
 void mcl_rbtree_insert(MCLRBTree *tree, MCLItemType item)
@@ -413,8 +426,10 @@ void mcl_rbtree_insert(MCLRBTree *tree, MCLItemType item)
 
   tree->num_items++;
 
+#ifdef DEBUG
   assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
   assert(_mcl_rbtree_verify(tree));
+#endif
 }
 
 void _mcl_rbtree_delete_case1(MCLRBTree *tree, MCLRBTreeNode *node);
@@ -600,7 +615,6 @@ void _mcl_rbtree_delete_node_with_one_child(MCLRBTree *tree
     }
     else
     {
-      printf("calling fixup\n");
       _mcl_rbtree_delete_fixup(tree, child);
     }
   }
@@ -620,6 +634,8 @@ void _mcl_rbtree_delete(MCLRBTree *tree, MCLRBTreeNode *node)
   }
 
   _mcl_rbtree_delete_node_with_one_child(tree, node);
+
+  free(node);
 }
 
 uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item)
@@ -635,10 +651,10 @@ uint8_t mcl_rbtree_delete(MCLRBTree *tree, MCLItemType item)
     tree->num_items--;
     _mcl_rbtree_delete(tree, node_to_delete);
 
-    free(node_to_delete);
-
+#ifdef DEBUG
     assert(_mcl_rbtree_validate_pointers(tree, tree->root, tree->sentinel));
     assert(_mcl_rbtree_verify(tree));
+#endif
 
     return 0;
   }
@@ -683,4 +699,33 @@ uint32_t _mcl_rbtree_depth(MCLRBTree *tree, MCLRBTreeNode *root)
 uint32_t mcl_rbtree_depth(MCLRBTree *tree)
 {
   return _mcl_rbtree_depth(tree, tree->root);
+}
+
+uint32_t mcl_rbtree_num_items(MCLRBTree *tree)
+{
+  return tree->num_items;
+}
+
+void _mcl_rbtree_visit_pre_order_helper(MCLRBTree *tree
+                                       ,MCLRBTreeNode *node
+                                       ,MCLVisitor visitor
+                                       ,void *user_data)
+{
+  if (node == tree->sentinel)
+  {
+    return;
+  }
+  else
+  {
+    _mcl_rbtree_visit_pre_order_helper(tree, node->left, visitor, user_data);
+    visitor(node->data, user_data);
+    _mcl_rbtree_visit_pre_order_helper(tree, node->right, visitor, user_data);
+  }
+}
+
+void mcl_rbtree_visit_pre_order(MCLRBTree *tree
+                               ,MCLVisitor visitor
+                               ,void *user_data)
+{
+  _mcl_rbtree_visit_pre_order_helper(tree, tree->root, visitor, user_data);
 }

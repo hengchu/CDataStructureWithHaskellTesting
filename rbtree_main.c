@@ -2,9 +2,14 @@
 #include <assert.h>
 #include <mcl_rbtree.h>
 
+void visitor(MCLItemType item, void *user_data)
+{
+  printf("%lu\n", item);
+}
+
 int main(int argc, char *argv[])
 {
-  int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+  int data[] = { 265,30,121,181,388,425,435,256,461,2,3,118 };
 
   MCLRBTree *tree = mcl_rbtree_create(mcl_default_comparator, NULL);
 
@@ -19,6 +24,8 @@ int main(int argc, char *argv[])
   }
 
   printf("tree depth: %d\n", mcl_rbtree_depth(tree));
+
+  mcl_rbtree_visit_pre_order(tree, visitor, 0);
 
   //for (int i = 0; i < num_items; i++)
   //{

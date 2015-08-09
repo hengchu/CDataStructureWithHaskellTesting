@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
 
 module MCLList
 ( MCLListH
@@ -18,7 +19,6 @@ module MCLList
 where
 
 import Foreign
-import Foreign.Ptr
 import Foreign.C.Types
 
 #include <mcl_list.h>
@@ -110,9 +110,9 @@ listInList (MCLListH listPtr) item = do
       return $ rc > 0
 
 listInListIf :: MCLListH -> MCLPred -> CIntPtr -> IO Bool
-listInListIf (MCLListH listPtr) pred userData = do
+listInListIf (MCLListH listPtr) predicate userData = do
   withForeignPtr listPtr $ \ptr -> do
-    cb <- mk_mcl_pred pred
+    cb <- mk_mcl_pred predicate
     rc <- c_mcl_list_in_list_if ptr cb userData
     freeHaskellFunPtr cb
     return $ rc > 0
