@@ -18,6 +18,7 @@ typedef struct MCLRBTree MCLRBTree;
 // comparator.
 MCLRBTree *mcl_rbtree_create(MCLComparator cmp, void *user_data);
 
+// Create an empty red black tree with the default comparator '<'
 MCLRBTree *mcl_rbtree_create_default();
 
 // Destroy this tree.
@@ -27,6 +28,17 @@ void mcl_rbtree_destroy(MCLRBTree *tree);
 
 // Insert an item into the red black tree.
 void mcl_rbtree_insert(MCLRBTree *tree, MCLItemType item);
+
+// Returns non-zero value if item is in the tree,
+// otherwise return 0.
+uint8_t mcl_rbtree_find(MCLRBTree *tree, MCLItemType item);
+
+// Returns non-zero value if there exists at least one
+// item matching the predicate, otherwise return
+// zero.
+uint8_t mcl_rbtree_find_if(MCLRBTree *tree
+                          ,MCLPredicate pred
+                          ,void *user_data);
 
 // Delete an item from the red black tree.
 // Returns zero on success

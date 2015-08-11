@@ -15,6 +15,8 @@ module MCLList
 , listReverse
 , listSort
 , listSortWith
+, listRetrieveHelper
+, listInsertHelper
 )
 where
 
@@ -152,3 +154,18 @@ listSortWith (MCLListH listPtr) cmp userData = do
     cb <- mk_mcl_cmp cmp
     c_mcl_list_sort_with ptr cb userData
     freeHaskellFunPtr cb
+
+listRetrieveHelper :: MCLListH -> IO [CIntPtr]
+listRetrieveHelper list =
+  listRetrieveHelper2 0 []
+  where listRetrieveHelper2 n acc = do
+          v <- listNthItem list n
+          case v of
+            (Just v') -> listRetrieveHelper2 (n+1) (v':acc)
+            Nothing   -> return acc
+
+listInsertHelper :: MCLListH -> [CIntPtr] -> IO ()
+listInsertHelper _ [] = return ()
+listInsertHelper list (x:xs) = do
+  listAppendFront list (fromIntegral x)
+  listInsertHelper list xs

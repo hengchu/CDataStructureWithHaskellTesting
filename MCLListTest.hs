@@ -8,21 +8,6 @@ import Data.List (sort)
 
 import ArbitraryInstances ()
 
-listInsertHelper :: MCLListH -> [CIntPtr] -> IO ()
-listInsertHelper _ [] = return ()
-listInsertHelper list (x:xs) = do
-  listAppendFront list (fromIntegral x)
-  listInsertHelper list xs
-
-listRetrieveHelper :: MCLListH -> IO [CIntPtr]
-listRetrieveHelper list =
-  listRetrieveHelper2 0 []
-  where listRetrieveHelper2 n acc = do
-          v <- listNthItem list n
-          case v of
-            (Just v') -> listRetrieveHelper2 (n+1) (v':acc)
-            Nothing   -> return acc
-
 genRandomList :: IO MCLListH
 genRandomList = do
   list <- newList

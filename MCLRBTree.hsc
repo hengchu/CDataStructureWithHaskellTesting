@@ -14,11 +14,15 @@ module MCLRBTree
 , MCLComparator
 , MCLVisitor
 , visitRBTreePreorder 
+, findWithPredicateInRBTree
+, findItemInRBTree
+, treeInsertHelper
 )
 where
 
 import Foreign
 import Foreign.C.Types
+import MCLUtility
 
 newtype MCLRBTree = MCLRBTree (Ptr MCLRBTree)
 
@@ -43,10 +47,6 @@ foreign import ccall safe "mcl_rbtree.h mcl_rbtree_depth"
 foreign import ccall safe "mcl_rbtree.h mcl_rbtree_delete"
   c_mcl_rbtree_delete :: (Ptr MCLRBTree) -> CIntPtr -> IO Int
 
-type MCLComparator = CIntPtr -> CIntPtr 
-                             -> CIntPtr 
-                             -> CUChar
-
 foreign import ccall "wrapper"
   mk_mcl_comparator :: MCLComparator -> IO (FunPtr MCLComparator)
 
@@ -62,6 +62,15 @@ foreign import ccall safe "mcl_rbtree.h mcl_rbtree_visit_pre_order"
   c_mcl_rbtree_visit_pre_order :: (Ptr MCLRBTree) -> (FunPtr MCLVisitor)
                                                   -> CIntPtr
                                                   -> IO ()
+
+foreign import ccall safe "mcl_rbtree.h mcl_rbtree_find_if"
+  c_mcl_rbtree_find_if :: (Ptr MCLRBTree) -> (FunPtr MCLPred) -> CIntPtr -> IO Int
+
+foreign import ccall "wrapper"
+  mk_mcl_pred :: MCLPred -> IO (FunPtr MCLPred)
+
+foreign import ccall unsafe "mcl_rbtree.h mcl_rbtree_find"
+  c_mcl_rbtree_find :: (Ptr MCLRBTree) -> CIntPtr -> IO Int
 
 data MCLRBTreeH = MCLRBTreeH !(ForeignPtr MCLRBTree)
   deriving (Eq, Ord, Show)
@@ -109,3 +118,24 @@ visitRBTreePreorder (MCLRBTreeH treePtr) visitor userData = do
   visitorFunPtr <- mk_mcl_visitor visitor
   withForeignPtr treePtr $ \ptr -> do
     c_mcl_rbtree_visit_pre_order ptr visitorFunPtr userData
+    freeHaskellFunPtr visitorFunPtr
+
+findWithPredicateInRBTree :: MCLRBTreeH -> MCLPred -> CIntPtr -> IO Bool
+findWithPredicateInRBTree (MCLRBTreeH treePtr) predicate userData = do
+  predicateFunPtr <- mk_mcl_pred predicate
+  withForeignPtr treePtr $ \ptr -> do
+    rc <- c_mcl_rbtree_find_if ptr predicateFunPtr userData
+    freeHaskellFunPtr predicateFunPtr
+    return $ rc > 0
+
+findItemInRBTree :: MCLRBTreeH -> CIntPtr -> IO Bool
+findItemInRBTree (MCLRBTreeH treePtr) itemToFind = do
+  withForeignPtr treePtr $ \ptr -> do
+    rc <- c_mcl_rbtree_find ptr itemToFind
+    return $ rc > 0
+
+treeInsertHelper :: MCLRBTreeH -> [CIntPtr] -> IO ()
+treeInsertHelper _ [] = return ()
+treeInsertHelper tree (x:xs) = do
+  insertItemIntoRBTree tree x
+  treeInsertHelper tree xs

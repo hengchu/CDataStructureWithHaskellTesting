@@ -195,6 +195,44 @@ MCLRBTreeNode *_mcl_rbtree_node_find(MCLRBTree *tree, MCLItemType item)
   return x;
 }
 
+uint8_t mcl_rbtree_find(MCLRBTree *tree, MCLItemType item)
+{
+  MCLRBTreeNode *node = _mcl_rbtree_node_find(tree, item);
+
+  if (node == tree->sentinel)
+  {
+    return 0;
+  }
+  else
+  {
+    return 1;
+  }
+}
+
+uint8_t _mcl_rbtree_find_if_helper(MCLRBTree *tree
+                                  ,MCLRBTreeNode *node
+                                  ,MCLPredicate pred
+                                  ,void *user_data)
+{
+  if (node == tree->sentinel)
+  {
+    return 0;
+  }
+
+  if (pred(node->data, user_data))
+  {
+    return 1;
+  }
+
+  return _mcl_rbtree_find_if_helper(tree, node->left, pred, user_data)
+      || _mcl_rbtree_find_if_helper(tree, node->right, pred, user_data);
+}
+
+uint8_t mcl_rbtree_find_if(MCLRBTree *tree, MCLPredicate pred, void *user_data)
+{
+  return _mcl_rbtree_find_if_helper(tree, tree->root, pred, user_data);
+}
+
 MCLRBTreeNode *_mcl_rbtree_minimum(MCLRBTree *tree, MCLRBTreeNode *node)
 {
   while (node->left != tree->sentinel)
